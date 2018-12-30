@@ -25,9 +25,21 @@ func main() {
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 	r.Use(func(c *gin.Context) {
-		reqID, _ := c.GetPostForm("request_id")
-		c.Set("RequestID", reqID)
-		fmt.Printf("RequestID: %s\n", reqID)
+		requestID := func() string {
+			if id, ok := c.GetPostForm("request_id"); ok {
+				return id
+			} else if id, ok = c.GetQuery("request_id"); ok {
+				return id
+			} else {
+				req := struct {
+					RequestID string `json:"request_id"`
+				}{}
+				c.BindJSON(&req)
+				return req.RequestID
+			}
+		}()
+		c.Set("RequestID", requestID)
+		fmt.Printf("RequestID: %s\n", requestID)
 		c.Next()
 	})
 	r.GET("/ping", func(c *gin.Context) {
