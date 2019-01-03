@@ -151,8 +151,9 @@ func deliverContact(c *gin.Context) {
 	}
 	contact := fmt.Sprintf("{\"user_id\":\"%s\"}", contactUID)
 	msgData := base64.StdEncoding.EncodeToString([]byte(contact))
+	msgID := mixin.UuidNewV4().String()
 	err = mixin.PostMessage(ctx, conversationID,
-		mixinUID, mixin.UuidNewV4().String(),
+		mixinUID, msgID,
 		"PLAIN_CONTACT", msgData, viper.GetString("mixin.client_id"),
 		viper.GetString("mixin.session_id"), viper.GetString("mixin.private_key"))
 	if err != nil {
@@ -161,6 +162,7 @@ func deliverContact(c *gin.Context) {
 	}
 	c.JSON(200, gin.H{
 		"conversation_id": conversationID,
+		"message_id":      msgID,
 	})
 }
 
