@@ -18,12 +18,11 @@ func deliverMessage(ctx context.Context, recipientID, category, msgData string) 
 	if err != nil {
 		return "", "", err
 	}
-	// contact := fmt.Sprintf("{\"user_id\":\"%s\"}", contactUID)
 	msgB64 := base64.StdEncoding.EncodeToString([]byte(msgData))
 	msgID := mixin.UuidNewV4().String()
 	err = mixin.PostMessage(ctx, conversationID,
 		recipientID, msgID,
-		"PLAIN_CONTACT", msgB64, viper.GetString("mixin.client_id"),
+		category, msgB64, viper.GetString("mixin.client_id"),
 		viper.GetString("mixin.session_id"), viper.GetString("mixin.private_key"))
 	if err != nil {
 		return "", "", err

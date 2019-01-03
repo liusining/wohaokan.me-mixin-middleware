@@ -52,6 +52,7 @@ func main() {
 	r.POST("/auth_info", authInfo)
 	r.POST("/deliver_money", deliverMoney)
 	r.POST("/deliver_contact", deliverContact)
+	r.POST("/deliver_text", deliverText)
 	r.Run(viper.GetString("service.bind_ip"))
 }
 
@@ -140,6 +141,30 @@ func deliverContact(c *gin.Context) {
 	}
 	contact := fmt.Sprintf("{\"user_id\":\"%s\"}", contactUID)
 	conversationID, msgID, err := deliverMessage(ctx, mixinUID, "PLAIN_CONTACT", contact)
+	if err != nil {
+		apiError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{
+		"conversation_id": conversationID,
+		"message_id":      msgID,
+	})
+}
+
+func deliverText(c *gin.Context) {
+	ctx := context.Background()
+	mixinUID, ok := c.GetPostForm("mixin_uid")
+	if !ok {
+		missParams(c, "mixin_uid")
+		return
+	}
+	msgData, ok := c.GetPostForm("msg")
+	fmt.Println(msgData)
+	if !ok {
+		missParams(c, "msg")
+		return
+	}
+	conversationID, msgID, err := deliverMessage(ctx, mixinUID, "PLAIN_TEXT", msgData)
 	if err != nil {
 		apiError(c, err)
 		return
