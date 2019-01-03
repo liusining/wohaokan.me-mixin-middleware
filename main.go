@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	mixin "github.com/MixinNetwork/bot-api-go-client"
@@ -51,6 +52,7 @@ func main() {
 	})
 	r.POST("/auth_info", authInfo)
 	r.POST("/deliver_money", deliverMoney)
+	r.POST("/deliver_contact", deliverContact)
 	r.Run(viper.GetString("service.bind_ip"))
 }
 
@@ -86,22 +88,19 @@ func authInfo(c *gin.Context) {
 
 func deliverMoney(c *gin.Context) {
 	ctx := context.Background()
-	missParams := func(field string) {
-		apiError(c, fmt.Errorf("missing params: %s", field))
-	}
 	assetID, ok := c.GetPostForm("asset_id")
 	if !ok {
-		missParams("asset_id")
+		missParams(c, "asset_id")
 		return
 	}
 	recipientID, ok := c.GetPostForm("endpoint")
 	if !ok {
-		missParams("endpoint")
+		missParams(c, "endpoint")
 		return
 	}
 	amount, ok := c.GetPostForm("amount")
 	if !ok {
-		missParams("amount")
+		missParams(c, "amount")
 		return
 	}
 	traceID := uuid.Must(uuid.NewV1()).String()
@@ -128,9 +127,50 @@ func deliverMoney(c *gin.Context) {
 	})
 }
 
+func deliverContact(c *gin.Context) {
+	ctx := context.Background()
+	mixinUID, ok := c.GetPostForm("mixin_uid")
+	if !ok {
+		missParams(c, "mixin_uid")
+		return
+	}
+	contactUID, ok := c.GetPostForm("contact_uid")
+	if !ok {
+		missParams(c, "contact_uid")
+		return
+	}
+	conversationID := mixin.UniqueConversationId(
+		viper.GetString("mixin.client_id"), mixinUID)
+	participants := []mixin.Participant{mixin.Participant{UserId: mixinUID, Role: ""}}
+	_, err := mixin.CreateConversation(ctx, "CONTACT",
+		conversationID, participants, viper.GetString("mixin.client_id"),
+		viper.GetString("mixin.session_id"), viper.GetString("mixin.private_key"))
+	if err != nil {
+		apiError(c, err)
+		return
+	}
+	contact := fmt.Sprintf("{\"user_id\":\"%s\"}", contactUID)
+	msgData := base64.StdEncoding.EncodeToString([]byte(contact))
+	err = mixin.PostMessage(ctx, conversationID,
+		mixinUID, mixin.UuidNewV4().String(),
+		"PLAIN_CONTACT", msgData, viper.GetString("mixin.client_id"),
+		viper.GetString("mixin.session_id"), viper.GetString("mixin.private_key"))
+	if err != nil {
+		apiError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{
+		"conversation_id": conversationID,
+	})
+}
+
 func apiError(c *gin.Context, err error) {
 	c.JSON(400, gin.H{
 		"err": fmt.Sprintf("%s", err),
 	})
 	fmt.Printf("err: %s\n", err)
+}
+
+func missParams(c *gin.Context, field string) {
+	apiError(c, fmt.Errorf("missing params: %s", field))
 }
