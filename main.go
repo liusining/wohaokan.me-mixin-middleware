@@ -5,7 +5,9 @@ import (
 	"fmt"
 
 	mixin "github.com/MixinNetwork/bot-api-go-client"
+	"github.com/MixinNetwork/go-number"
 	"github.com/gin-gonic/gin"
+	"github.com/satori/go.uuid"
 	"github.com/spf13/viper"
 )
 
@@ -48,6 +50,7 @@ func main() {
 		})
 	})
 	r.POST("/auth_info", authInfo)
+	r.POST("/deliver_money", deliverMoney)
 	r.Run(viper.GetString("service.bind_ip"))
 }
 
@@ -78,6 +81,50 @@ func authInfo(c *gin.Context) {
 		"identity_number": user.IdentityNumber,
 		"full_name":       user.FullName,
 		"avatar_url":      user.AvatarURL,
+	})
+}
+
+func deliverMoney(c *gin.Context) {
+	ctx := context.Background()
+	missParams := func(field string) {
+		apiError(c, fmt.Errorf("missing params: %s", field))
+	}
+	assetID, ok := c.GetPostForm("asset_id")
+	if !ok {
+		missParams("asset_id")
+		return
+	}
+	recipientID, ok := c.GetPostForm("endpoint")
+	if !ok {
+		missParams("endpoint")
+		return
+	}
+	amount, ok := c.GetPostForm("amount")
+	if !ok {
+		missParams("amount")
+		return
+	}
+	traceID := uuid.Must(uuid.NewV1()).String()
+	memo, _ := c.GetPostForm("memo")
+	tran := mixin.TransferInput{
+		AssetId:     assetID,
+		RecipientId: recipientID,
+		Amount:      number.FromString(amount),
+		TraceId:     traceID,
+		Memo:        memo,
+	}
+	err := mixin.CreateTransfer(ctx, &tran,
+		viper.GetString("mixin.client_id"),
+		viper.GetString("mixin.session_id"),
+		viper.GetString("mixin.private_key"),
+		viper.GetString("mixin.pin"),
+		viper.GetString("mixin.pin_token"))
+	if err != nil {
+		apiError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{
+		"trace_id": traceID,
 	})
 }
 
