@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 
 	mixin "github.com/MixinNetwork/bot-api-go-client"
@@ -139,23 +138,8 @@ func deliverContact(c *gin.Context) {
 		missParams(c, "contact_uid")
 		return
 	}
-	conversationID := mixin.UniqueConversationId(
-		viper.GetString("mixin.client_id"), mixinUID)
-	participants := []mixin.Participant{mixin.Participant{UserId: mixinUID, Role: ""}}
-	_, err := mixin.CreateConversation(ctx, "CONTACT",
-		conversationID, participants, viper.GetString("mixin.client_id"),
-		viper.GetString("mixin.session_id"), viper.GetString("mixin.private_key"))
-	if err != nil {
-		apiError(c, err)
-		return
-	}
 	contact := fmt.Sprintf("{\"user_id\":\"%s\"}", contactUID)
-	msgData := base64.StdEncoding.EncodeToString([]byte(contact))
-	msgID := mixin.UuidNewV4().String()
-	err = mixin.PostMessage(ctx, conversationID,
-		mixinUID, msgID,
-		"PLAIN_CONTACT", msgData, viper.GetString("mixin.client_id"),
-		viper.GetString("mixin.session_id"), viper.GetString("mixin.private_key"))
+	conversationID, msgID, err := deliverMessage(ctx, mixinUID, "PLAIN_CONTACT", contact)
 	if err != nil {
 		apiError(c, err)
 		return
